@@ -27,7 +27,7 @@ SITEMAPS = [
 ]
 
 SAVE_DIR = "posts"
-WORKERS = 15   # increase to 20–30 if your internet is strong
+WORKERS = 30   # increase to 20–30 if your internet is strong
 # ---------------------------------------
 
 os.makedirs(SAVE_DIR, exist_ok=True)
@@ -119,3 +119,4 @@ with ThreadPoolExecutor(max_workers=WORKERS) as executor:
 
 print("\n🎉 DONE")
 print("📄 Pages saved:", len(content_hashes))
+
