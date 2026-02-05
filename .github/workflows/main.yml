@@ -1,0 +1,56 @@
+name: Run API
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      #Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      # Install dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests lxml beautifulsoup4
+
+      # Run the automation script
+      - name: Run Google Drive automation
+        run: python a.py
+
+      # Commit failed.txt and posts folder
+      - name: Commit generated files
+        run: |
+          git config --global user.name "GitHub Bot"
+          git config --global user.email "github-bot@example.com"
+
+          FILES_TO_COMMIT=""
+
+          if [ -f "failed.txt" ]; then
+            FILES_TO_COMMIT="$FILES_TO_COMMIT failed.txt"
+          fi
+
+          if [ -d "posts" ]; then
+            FILES_TO_COMMIT="$FILES_TO_COMMIT posts"
+          fi
+
+          if [ ! -z "$FILES_TO_COMMIT" ]; then
+            git add $FILES_TO_COMMIT
+            git commit -m "Update failed.txt and posts"
+            git push
+          else
+            echo "No files to commit. Skipping push."
+          fi
