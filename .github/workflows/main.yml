@@ -31,7 +31,7 @@ jobs:
       - name: Run Google Drive automation
         run: python a.py
 
-      # Commit failed.txt and posts folder
+      # Commit failed.txt and output folder
       - name: Commit generated files
         run: |
           git config --global user.name "GitHub Bot"
@@ -43,13 +43,13 @@ jobs:
             FILES_TO_COMMIT="$FILES_TO_COMMIT failed.txt"
           fi
 
-          if [ -d "posts" ]; then
-            FILES_TO_COMMIT="$FILES_TO_COMMIT posts"
+          if [ -d "output" ]; then
+            FILES_TO_COMMIT="$FILES_TO_COMMIT output"
           fi
 
           if [ ! -z "$FILES_TO_COMMIT" ]; then
             git add $FILES_TO_COMMIT
-            git commit -m "Update failed.txt and posts"
+            git commit -m "Update failed.txt and output"
             git push
           else
             echo "No files to commit. Skipping push."
