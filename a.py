@@ -1,105 +1,112 @@
+# a.py
 import os
 from bs4 import BeautifulSoup
 
 # Paths
-BASE_FOLDER = os.path.dirname(os.path.abspath(__file__))  # folder where a.py is located
-INPUT_FOLDER = os.path.join(BASE_FOLDER, "posts")          # original HTML files
-OUTPUT_FOLDER = os.path.join(BASE_FOLDER, "output")       # prebuilt HTML files
+INPUT_FOLDER = "posts"      # Folder containing HTML files
+OUTPUT_FOLDER = "output"   # Folder to save generated HTML
 
-# Ensure output folder exists
+# Create output folder if it doesn't exist
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Process all HTML files
-for filename in os.listdir(INPUT_FOLDER):
-    if filename.lower().endswith(".html"):
-        input_path = os.path.join(INPUT_FOLDER, filename)
+# Function to extract movie info from HTML content
+def extract_movie_info(html_content):
+    soup = BeautifulSoup(html_content, "html.parser")
 
-        # Read HTML content
-        with open(input_path, "r", encoding="utf-8") as file:
-            html_content = file.read()
+    # Movie title
+    title_tag = soup.find("title")
+    title = title_tag.get_text(strip=True) if title_tag else "No Title"
 
-        soup = BeautifulSoup(html_content, "html.parser")
+    # OG image
+    og_image_tag = soup.find("meta", property="og:image")
+    og_image = og_image_tag.get("content") if og_image_tag else ""
 
-        # Basic movie info
-        title = soup.find("title").text if soup.find("title") else "No Title"
-        cover_img = soup.find("meta", property="og:image")["content"] if soup.find("meta", property="og:image") else ""
-
-        # Movie details from <ul>
-        details = {}
-        for li in soup.find_all("li"):
-            if li.strong:
-                key = li.strong.text.replace(":", "").strip()
-                value = li.text.replace(li.strong.text, "").strip()
+    # Movie details (from <ul>)
+    details = {}
+    ul_tag = soup.find("ul")
+    if ul_tag:
+        for li in ul_tag.find_all("li"):
+            strong_tag = li.find("strong")
+            if strong_tag and ":" in li.get_text():
+                key = strong_tag.get_text(strip=True).rstrip(":")
+                value = li.get_text(strip=True).replace(strong_tag.get_text(), "").lstrip(": ").strip()
                 details[key] = value
 
-        # Screenshots
-        screenshots = [img["src"] for img in soup.find_all("img")]
+    # Screenshots
+    screenshots = []
+    for img in soup.find_all("img"):
+        src = img.get("src") or img.get("data-src")
+        if src:
+            screenshots.append(src)
 
-        # Versions and download links
-        versions = []
-        for h5 in soup.find_all("h5"):
-            version_name = h5.get_text(strip=True)
-            # The next <p> after <h5> contains links
-            p_tag = h5.find_next("p")
+    # Download links (from <h5> and following <p>)
+    downloads = []
+    for h5 in soup.find_all("h5"):
+        version = h5.get_text(strip=True)
+        p_tag = h5.find_next_sibling("p")
+        if p_tag:
             links = []
-            if p_tag:
-                for a in p_tag.find_all("a", class_="dl"):
-                    links.append({
-                        "text": a.text.strip(),
-                        "href": a["href"]
-                    })
-            versions.append({
-                "name": version_name,
-                "links": links
-            })
+            for a in p_tag.find_all("a"):
+                href = a.get("href")
+                if href:
+                    links.append((a.get_text(strip=True), href))
+            if links:
+                downloads.append({"version": version, "links": links})
 
-        # Build prebuilt HTML
-        prebuilt_html = f"""
-<!DOCTYPE html>
+    return {
+        "title": title,
+        "og_image": og_image,
+        "details": details,
+        "screenshots": screenshots,
+        "downloads": downloads
+    }
+
+# Function to generate HTML for each movie
+def generate_html(movie):
+    html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{title}</title>
-<style>
-    body {{ font-family: Arial, sans-serif; margin: 20px; }}
-    img {{ max-width: 300px; margin: 10px; }}
-    .details li {{ margin-bottom: 5px; }}
-    .download a {{ display: inline-block; padding: 10px; background: #13BF3C; color: white; text-decoration: none; margin: 5px; border-radius: 5px; }}
-    .version {{ margin-bottom: 20px; }}
-</style>
+<title>{movie['title']}</title>
 </head>
 <body>
-<h1>{details.get("Full Name", title)}</h1>
-<img src="{cover_img}" alt="Cover Image" />
+<h1>{movie['title']}</h1>
+<img src="{movie['og_image']}" alt="{movie['title']}" style="max-width:300px;"/>
 
 <h2>Movie Details:</h2>
-<ul class="details">
+<ul>
 """
-        for k, v in details.items():
-            prebuilt_html += f"    <li><strong>{k}:</strong> {v}</li>\n"
-        prebuilt_html += "</ul>\n"
+    for key, value in movie["details"].items():
+        html += f"<li><strong>{key}:</strong> {value}</li>\n"
+    html += "</ul>\n"
 
-        # Screenshots
-        prebuilt_html += "<h2>Screenshots:</h2>\n"
-        for shot in screenshots:
-            prebuilt_html += f'<img src="{shot}" alt="Screenshot" />\n'
+    if movie["screenshots"]:
+        html += "<h2>Screenshots:</h2>\n"
+        for src in movie["screenshots"]:
+            html += f'<img src="{src}" alt="screenshot" style="max-width:200px; margin:5px;">\n'
 
-        # Versions and links
-        prebuilt_html += "<h2>Download Versions:</h2>\n"
-        for v in versions:
-            prebuilt_html += f'<div class="version"><h3>{v["name"]}</h3>\n<div class="download">\n'
-            for link in v["links"]:
-                prebuilt_html += f'<a href="{link["href"]}" target="_blank">{link["text"]}</a>\n'
-            prebuilt_html += "</div></div>\n"
+    if movie["downloads"]:
+        html += "<h2>Download Links:</h2>\n"
+        for dl in movie["downloads"]:
+            html += f"<h3>{dl['version']}</h3>\n<p>\n"
+            for text, link in dl["links"]:
+                html += f'<a href="{link}" target="_blank">{text}</a> | '
+            html = html.rstrip(" | ")
+            html += "</p>\n"
 
-        prebuilt_html += "</body>\n</html>"
+    html += "</body>\n</html>"
+    return html
 
-        # Save output
-        output_path = os.path.join(OUTPUT_FOLDER, f"prebuilt_{filename}")
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(prebuilt_html)
+# Process all HTML files in INPUT_FOLDER
+for filename in os.listdir(INPUT_FOLDER):
+    if filename.lower().endswith(".html"):
+        filepath = os.path.join(INPUT_FOLDER, filename)
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+        movie_info = extract_movie_info(content)
+        out_file = os.path.join(OUTPUT_FOLDER, filename)
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.write(generate_html(movie_info))
+        print(f"Processed: {filename}")
 
-        print(f"Processed: {filename} -> {output_path}")
-
-print("\nAll HTML files processed successfully!")
+print("All HTML files processed successfully!")
